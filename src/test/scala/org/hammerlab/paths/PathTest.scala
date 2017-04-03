@@ -16,7 +16,7 @@ class PathTest
   }
 
   test("removals") {
-    val dir = Path(tmpDir())
+    val dir = tmpDir()
 
     assert(dir.exists)
 
@@ -86,7 +86,7 @@ class PathTest
         "ghi"
       )
 
-    val path = Path(tmpPath())
+    val path = tmpPath()
     path.writeLines(lines)
     path.lines.toSeq should be(lines)
   }
