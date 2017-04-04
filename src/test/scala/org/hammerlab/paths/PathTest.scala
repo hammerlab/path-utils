@@ -12,7 +12,7 @@ class PathTest
   test("extensions") {
     "abc.def".extension should be("def")
     "/abc/def.gh.ij".extension should be("ij")
-    "hdfs://foo/bar.baz".extension should be("baz")
+    "file:///foo/bar.baz".extension should be("baz")
   }
 
   test("removals") {
