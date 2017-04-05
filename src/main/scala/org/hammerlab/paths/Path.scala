@@ -13,11 +13,11 @@ class Path(val path: JPath)
   extends AnyVal
     with Serializable {
 
-  override def toString: String = uri.toString
+  override def toString: String = path.toString
 
   def uri: URI = path.toUri
 
-  def extension: String = getExtension(toString)
+  def extension: String = getExtension(basename)
 
   def exists: Boolean = Files.exists(path)
 
@@ -80,7 +80,7 @@ class Path(val path: JPath)
   /**
    * Append `suffix` to the basename of this [[Path]].
    */
-  def +(suffix: String): Path = Path(toString + suffix)
+  def +(suffix: String): Path = Path(path.toString + suffix)
 
   def /(basename: String): Path = Path(path.resolve(basename))
 
