@@ -1,5 +1,6 @@
 package org.hammerlab.paths
 
+import java.nio.file.Files
 import java.nio.file.Files.createDirectory
 
 import org.hammerlab.test.Suite
@@ -11,8 +12,17 @@ class PathTest
 
   test("extensions") {
     "abc.def".extension should be("def")
+    Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
+    Path("abc.def") / "ghi" should be(Path("abc.def/ghi"))
+
     "/abc/def.gh.ij".extension should be("ij")
     "file:///foo/bar.baz".extension should be("baz")
+    Path("file:///foo/bar.baz") + ".qux" should be(Path("file:///foo/bar.baz.qux"))
+    Path("file:///foo/bar.baz") / "qux" should be(Path("file:///foo/bar.baz/qux"))
+
+    val dir = tmpPath(suffix = ".foo")
+    Files.createDirectory(dir)
+    dir.extension should be("foo")
   }
 
   test("removals") {
