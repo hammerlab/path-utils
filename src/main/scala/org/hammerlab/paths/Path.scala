@@ -1,6 +1,6 @@
 package org.hammerlab.paths
 
-import java.io.{ InputStream, OutputStream, PrintWriter }
+import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintWriter }
 import java.net.URI
 import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
 import java.nio.file.{ DirectoryStream, Files, Paths, Path ⇒ JPath }
@@ -9,11 +9,20 @@ import org.apache.commons.io.FilenameUtils.getExtension
 
 import scala.collection.JavaConverters._
 
-class Path(val path: JPath)
-  extends AnyVal
-    with Serializable {
+case class Path(path: JPath) {
 
-  override def toString: String = path.toString
+  @throws[ObjectStreamException]
+  def writeReplace: Object = {
+    val sp = new SerializablePath
+    sp.str = toString
+    sp
+  }
+
+  override def toString: String =
+    if (path.isAbsolute)
+      uri.toString
+    else
+      path.toString
 
   def uri: URI = path.toUri
 
@@ -80,7 +89,7 @@ class Path(val path: JPath)
   /**
    * Append `suffix` to the basename of this [[Path]].
    */
-  def +(suffix: String): Path = Path(path.toString + suffix)
+  def +(suffix: String): Path = Path(toString + suffix)
 
   def /(basename: String): Path = Path(path.resolve(basename))
 
@@ -107,17 +116,28 @@ class Path(val path: JPath)
 }
 
 object Path {
-  def apply(path: JPath): Path = new Path(path)
+
+  import FileSystems.init
+
+  private def get(pathStr: String): JPath = {
+    init()
+    Paths.get(pathStr)
+  }
+
+  private def get(uri: URI): JPath = {
+    init()
+    Paths.get(uri)
+  }
 
   def apply(pathStr: String): Path = {
     val uri = new URI(pathStr)
     if (uri.getScheme == null)
-      new Path(Paths.get(pathStr))
+      new Path(get(pathStr))
     else
       Path(uri)
   }
 
-  def apply(uri: URI): Path = new Path(Paths.get(uri))
+  def apply(uri: URI): Path = Path(get(uri))
 
   implicit def toJava(path: Path): JPath = path.path
 }
