@@ -1,5 +1,6 @@
 package org.hammerlab.paths
 
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
 import java.nio.file.Files
 import java.nio.file.Files.{ createDirectory, createTempDirectory }
 
@@ -103,6 +104,22 @@ class PathTest
     val path = tmpPath()
     path.writeLines(lines)
     path.lines.toSeq should be(lines)
+  }
+
+  test("serialize path") {
+    val path = Path("abc/def")
+    val baos = new ByteArrayOutputStream()
+    val oos = new ObjectOutputStream(baos)
+
+    oos.writeObject(path)
+
+    val bytes = baos.toByteArray
+    bytes.length should be(94)
+
+    val bais = new ByteArrayInputStream(bytes)
+    val ois = new ObjectInputStream(bais)
+
+    ois.readObject().asInstanceOf[Path] should be(path)
   }
 
   val dirs = ArrayBuffer[Path]()
