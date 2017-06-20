@@ -1,13 +1,18 @@
 package org.hammerlab.paths
 
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
 import java.nio.file.Files
-import java.nio.file.Files.createDirectory
+import java.nio.file.Files.{ createDirectory, createTempDirectory }
 
-import org.hammerlab.test.Suite
-import org.hammerlab.test.matchers.seqs.SeqMatcher.seqMatch
+import org.scalatest.{ BeforeAndAfterAll, FunSuite, Matchers }
+
+import scala.collection.mutable.ArrayBuffer
 
 class PathTest
-  extends Suite {
+  extends FunSuite
+    with Matchers
+    with BeforeAndAfterAll {
+
   implicit def strToPath(str: String): Path = Path(str)
 
   test("extensions") {
@@ -58,14 +63,14 @@ class PathTest
 
     assert(baz.exists)
 
-    dir.list.toSeq should seqMatch(
+    dir.list.toSeq should be(
       Seq(
         bar,
         foo
       )
     )
 
-    dir.walk.toSeq should seqMatch(
+    dir.walk.toSeq should be(
       Seq(
         dir,
         bar,
@@ -99,5 +104,41 @@ class PathTest
     val path = tmpPath()
     path.writeLines(lines)
     path.lines.toSeq should be(lines)
+  }
+
+  test("serialize path") {
+    val path = Path("abc/def")
+    val baos = new ByteArrayOutputStream()
+    val oos = new ObjectOutputStream(baos)
+
+    oos.writeObject(path)
+
+    val bytes = baos.toByteArray
+    bytes.length should be(94)
+
+    val bais = new ByteArrayInputStream(bytes)
+    val ois = new ObjectInputStream(bais)
+
+    ois.readObject().asInstanceOf[Path] should be(path)
+  }
+
+  val dirs = ArrayBuffer[Path]()
+
+  def tmpDir(prefix: String = this.getClass.getSimpleName): Path = {
+    val f = Path(createTempDirectory(prefix))
+    dirs += f
+    f
+  }
+
+  /**
+   * Return a [[Path]] to a temporary file that has not yet been created.
+   */
+  def tmpPath(prefix: String = this.getClass.getSimpleName,
+              suffix: String = ""): Path =
+    tmpDir() / (prefix + suffix)
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    dirs.foreach(d ⇒ if (d.exists) d.delete(true))
   }
 }
