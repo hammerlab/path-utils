@@ -5,6 +5,8 @@ import java.net.URI
 import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
 import java.nio.file.{ DirectoryStream, Files, Paths, Path ⇒ JPath }
 
+import caseapp.core.ArgParser
+import caseapp.core.ArgParser.instance
 import org.apache.commons.io.FilenameUtils.getExtension
 
 import scala.collection.JavaConverters._
@@ -141,4 +143,12 @@ object Path {
   def apply(uri: URI): Path = Path(get(uri))
 
   implicit def toJava(path: Path): JPath = path.path
+
+  implicit val parser: ArgParser[Path] =
+    instance("path") {
+      str ⇒
+        Right(
+          Path(str)
+        )
+    }
 }
