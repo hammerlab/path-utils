@@ -94,11 +94,12 @@ case class Path(path: JPath) {
   def /(basename: String): Path = Path(path.resolve(basename))
 
   def lines: Iterator[String] =
-    Files.lines(path)
+    Files
+      .lines(path)
       .iterator
       .asScala
 
-  def read: String = lines.mkString("\n")
+  def read: String = new String(readBytes)
 
   def readBytes: Array[Byte] = readAllBytes(path)
 

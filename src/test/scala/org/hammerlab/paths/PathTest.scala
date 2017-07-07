@@ -106,6 +106,25 @@ class PathTest
     path.lines.toSeq should be(lines)
   }
 
+  test("read empty last line") {
+    val lines =
+      Seq(
+        "abc",
+        "def",
+        "ghi"
+      )
+
+    val path = tmpPath()
+    path.writeLines(lines)
+    path.read should be(
+      """abc
+        |def
+        |ghi
+        |"""
+      .stripMargin
+    )
+  }
+
   test("serialize path") {
     val path = Path("abc/def")
     val baos = new ByteArrayOutputStream()
