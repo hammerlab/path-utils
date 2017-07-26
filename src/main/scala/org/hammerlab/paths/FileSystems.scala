@@ -31,15 +31,14 @@ object FileSystems
 
         lock.synchronized {
           if (loadingProvidersField.get(null).asInstanceOf[Boolean]) {
-            logger.info("FileSystems already loaded! forcing reload")
+            info("FileSystems already loaded! forcing reload")
             loadingProvidersField.set(null, false)
             installedProvidersField.set(null, null)
           } else {
-            logger.info("Loading filesystems")
+            info("Loading filesystems")
           }
           load()
           _filesystemsInitialized = true
-
         }
       }
     }
@@ -52,8 +51,10 @@ object FileSystems
     val prevClassLoader = ClassLoader.getSystemClassLoader
     scl.set(null, Thread.currentThread().getContextClassLoader)
 
-    logger.info(
-      s"Loaded filesystems for schemes: ${FileSystemProvider.installedProviders().asScala.map(_.getScheme).mkString(",")}"
+    val providers = FileSystemProvider.installedProviders().asScala
+
+    info(
+      s"Loaded filesystems for schemes: ${providers.map(_.getScheme).mkString(",")}"
     )
 
     scl.set(null, prevClassLoader)
