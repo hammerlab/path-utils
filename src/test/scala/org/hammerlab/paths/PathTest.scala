@@ -160,4 +160,20 @@ class PathTest
     super.afterAll()
     dirs.foreach(d ⇒ if (d.exists) d.delete(true))
   }
+
+  test("parentOpt") {
+    Path("/").parentOpt should be(None)
+    Path("/a").parentOpt should be(Some(Path("/")))
+    Path("/a/b").parentOpt should be(Some(Path("/a")))
+    Path("a").parentOpt should be(None)
+    Path("a/b").parentOpt should be(Some(Path("a")))
+  }
+
+  test("parent") {
+    Path("/").parent should be(Path("/"))
+    Path("/a").parent should be(Path("/"))
+    Path("/a/b").parent should be(Path("/a"))
+    Path("a").parent should be(Path("a"))
+    Path("a/b").parent should be(Path("a"))
+  }
 }

@@ -32,7 +32,9 @@ case class Path(path: JPath) {
 
   def exists: Boolean = Files.exists(path)
 
-  def parent: Path = Path(path.getParent)
+  def parent: Path = parentOpt.getOrElse(this)
+  def parentOpt: Option[Path] = Option(path.getParent).map(Path(_))
+
   def basename: String = path.getFileName.toString
 
   def size: Long = Files.size(path)
