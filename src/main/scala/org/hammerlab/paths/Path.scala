@@ -1,7 +1,7 @@
 package org.hammerlab.paths
 
 import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintWriter }
-import java.net.URI
+import java.net.{ URI, URISyntaxException }
 import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
 import java.nio.file.{ DirectoryStream, Files, Paths, Path ⇒ JPath }
 
@@ -34,6 +34,14 @@ case class Path(path: JPath) {
 
   def parent: Path = parentOpt.getOrElse(this)
   def parentOpt: Option[Path] = Option(path.getParent).map(Path(_))
+
+  def depth: Int =
+    if (path.isAbsolute)
+      parentOpt
+        .map(_.depth + 1)
+        .getOrElse(0)
+    else
+      Path(path.toAbsolutePath).depth
 
   def basename: String = path.getFileName.toString
 
@@ -134,13 +142,17 @@ object Path {
     Paths.get(uri)
   }
 
-  def apply(pathStr: String): Path = {
-    val uri = new URI(pathStr)
-    if (uri.getScheme == null)
-      new Path(get(pathStr))
-    else
-      Path(uri)
-  }
+  def apply(pathStr: String): Path =
+    try {
+      val uri = new URI(pathStr)
+      if (uri.getScheme == null)
+        new Path(get(pathStr))
+      else
+        Path(uri)
+    } catch {
+      case _: URISyntaxException ⇒
+        new Path(get(pathStr))
+    }
 
   def apply(uri: URI): Path = Path(get(uri))
 

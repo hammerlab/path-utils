@@ -176,4 +176,25 @@ class PathTest
     Path("a").parent should be(Path("a"))
     Path("a/b").parent should be(Path("a"))
   }
+
+  val testDirDepth = Path(".").depth
+
+  test("depth") {
+    Path("/").depth should be(0)
+    Path("/a").depth should be(1)
+    Path("/a/b").depth should be(2)
+
+    Path("a").depth should be(testDirDepth)
+    Path("a/b").depth should be(testDirDepth + 1)
+  }
+
+  test("with spaces") {
+    Path("a b").depth should be(testDirDepth)
+    Path("a b/c d").depth should be(testDirDepth + 1)
+    Path("/a b").depth should be(1)
+    Path("/a b/c d").depth should be(2)
+
+    // Invalid characters for URI, interpret as local file
+    Path("hdfs:///a b").uri.getScheme should be("file")
+  }
 }
