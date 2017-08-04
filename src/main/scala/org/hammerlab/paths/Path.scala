@@ -1,10 +1,12 @@
 package org.hammerlab.paths
 
 import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintWriter }
-import java.net.URI
+import java.net.{ URI, URISyntaxException }
 import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
 import java.nio.file.{ DirectoryStream, Files, Paths, Path ⇒ JPath }
 
+import caseapp.core.ArgParser
+import caseapp.core.ArgParser.instance
 import org.apache.commons.io.FilenameUtils.getExtension
 
 import scala.collection.JavaConverters._
@@ -30,7 +32,17 @@ case class Path(path: JPath) {
 
   def exists: Boolean = Files.exists(path)
 
-  def parent: Path = Path(path.getParent)
+  def parent: Path = parentOpt.getOrElse(this)
+  def parentOpt: Option[Path] = Option(path.getParent).map(Path(_))
+
+  def depth: Int =
+    if (path.isAbsolute)
+      parentOpt
+        .map(_.depth + 1)
+        .getOrElse(0)
+    else
+      Path(path.toAbsolutePath).depth
+
   def basename: String = path.getFileName.toString
 
   def size: Long = Files.size(path)
@@ -94,11 +106,12 @@ case class Path(path: JPath) {
   def /(basename: String): Path = Path(path.resolve(basename))
 
   def lines: Iterator[String] =
-    Files.lines(path)
+    Files
+      .lines(path)
       .iterator
       .asScala
 
-  def read: String = lines.mkString("\n")
+  def read: String = new String(readBytes)
 
   def readBytes: Array[Byte] = readAllBytes(path)
 
@@ -129,15 +142,27 @@ object Path {
     Paths.get(uri)
   }
 
-  def apply(pathStr: String): Path = {
-    val uri = new URI(pathStr)
-    if (uri.getScheme == null)
-      new Path(get(pathStr))
-    else
-      Path(uri)
-  }
+  def apply(pathStr: String): Path =
+    try {
+      val uri = new URI(pathStr)
+      if (uri.getScheme == null)
+        new Path(get(pathStr))
+      else
+        Path(uri)
+    } catch {
+      case _: URISyntaxException ⇒
+        new Path(get(pathStr))
+    }
 
   def apply(uri: URI): Path = Path(get(uri))
 
   implicit def toJava(path: Path): JPath = path.path
+
+  implicit val parser: ArgParser[Path] =
+    instance("path") {
+      str ⇒
+        Right(
+          Path(str)
+        )
+    }
 }

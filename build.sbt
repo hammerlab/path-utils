@@ -1,8 +1,9 @@
 name := "paths"
-version := "1.1.0-SNAPSHOT"
+version := "1.2.0"
 deps ++= Seq(
-  libs.value('commons_io),
-  libs.value('slf4j)
+  case_app,
+  commons_io,
+  slf4j
 )
-testDeps := Seq(scalatest.value)
+testDeps := Seq(scalatest)
 addScala212

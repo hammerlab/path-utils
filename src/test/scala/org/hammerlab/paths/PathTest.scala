@@ -106,6 +106,25 @@ class PathTest
     path.lines.toSeq should be(lines)
   }
 
+  test("read empty last line") {
+    val lines =
+      Seq(
+        "abc",
+        "def",
+        "ghi"
+      )
+
+    val path = tmpPath()
+    path.writeLines(lines)
+    path.read should be(
+      """abc
+        |def
+        |ghi
+        |"""
+      .stripMargin
+    )
+  }
+
   test("serialize path") {
     val path = Path("abc/def")
     val baos = new ByteArrayOutputStream()
@@ -140,5 +159,42 @@ class PathTest
   override def afterAll(): Unit = {
     super.afterAll()
     dirs.foreach(d ⇒ if (d.exists) d.delete(true))
+  }
+
+  test("parentOpt") {
+    Path("/").parentOpt should be(None)
+    Path("/a").parentOpt should be(Some(Path("/")))
+    Path("/a/b").parentOpt should be(Some(Path("/a")))
+    Path("a").parentOpt should be(None)
+    Path("a/b").parentOpt should be(Some(Path("a")))
+  }
+
+  test("parent") {
+    Path("/").parent should be(Path("/"))
+    Path("/a").parent should be(Path("/"))
+    Path("/a/b").parent should be(Path("/a"))
+    Path("a").parent should be(Path("a"))
+    Path("a/b").parent should be(Path("a"))
+  }
+
+  val testDirDepth = Path(".").depth
+
+  test("depth") {
+    Path("/").depth should be(0)
+    Path("/a").depth should be(1)
+    Path("/a/b").depth should be(2)
+
+    Path("a").depth should be(testDirDepth)
+    Path("a/b").depth should be(testDirDepth + 1)
+  }
+
+  test("with spaces") {
+    Path("a b").depth should be(testDirDepth)
+    Path("a b/c d").depth should be(testDirDepth + 1)
+    Path("/a b").depth should be(1)
+    Path("/a b/c d").depth should be(2)
+
+    // Invalid characters for URI, interpret as local file
+    Path("hdfs:///a b").uri.getScheme should be("file")
   }
 }
