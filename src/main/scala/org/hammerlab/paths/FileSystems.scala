@@ -51,23 +51,36 @@ object FileSystems
       }
     }
 
+  /**
+   * Clear [[FileSystemProvider]] state and return previously-loaded [[FileSystemProvider]]s
+   */
+  def clearProviders: Seq[FileSystemProvider] = {
+    loadingProvidersField.set(null, false)
+
+    val providers =
+      FileSystemProvider
+        .installedProviders()
+        .asScala
+
+    // null out the field for now so that it will register as needing to be reloaded later
+    installedProvidersField.set(null, null)
+
+    providers
+  }
+
+  def installedProviders: Seq[FileSystemProvider] =
+    FileSystemProvider
+      .installedProviders()
+      .asScala
+
   private def load(): Unit = {
 
     val existingProviders =
       if (loadingProvidersField.get(null).asInstanceOf[Boolean]) {
         info("FileSystems already loaded! forcing reload")
-        loadingProvidersField.set(null, false)
-        val providers =
-          installedProvidersField
-            .get(null)
-            .asInstanceOf[util.List[FileSystemProvider]]
-
-        // null out the field for now so that it will register as needing to be reloaded later
-        installedProvidersField.set(null, null)
-
-        providers.asScala
+        clearProviders
       } else {
-        val providers = FileSystemProvider.installedProviders().asScala
+        val providers = installedProviders
         info(s"Loading filesystems, starting with: ${providers.map(_.getScheme).mkString(",")}")
         providers
       }
@@ -84,15 +97,13 @@ object FileSystems
     scl.set(null, Thread.currentThread().getContextClassLoader)
 
     var newClassLoaderProviders =
-      FileSystemProvider
-        .installedProviders()
-        .asScala
-        .map(
+      installedProviders
+      .map(
           p ⇒
             p.getScheme →
               p
         )
-        .toMap
+      .toMap
 
     val existingProvidersMap =
       existingProviders
@@ -142,7 +153,7 @@ object FileSystems
     scl.set(null, prevClassLoader)
 
     info(
-      s"Filesystems exist for schemes: ${FileSystemProvider.installedProviders().asScala.map(_.getScheme).mkString(",")}"
+      s"Filesystems exist for schemes: ${installedProviders.map(_.getScheme).mkString(",")}"
     )
   }
 }

@@ -6,11 +6,12 @@ import java.nio.file.Files
 import java.nio.file.Files.{ createDirectory, createTempDirectory }
 import java.nio.file.spi.FileSystemProvider
 
+import com.sun.nio.zipfs
+import org.hammerlab.paths.FileSystems._
 import org.scalatest.{ BeforeAndAfterAll, FunSuite, Matchers }
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
-import java.net.URLClassLoader
 
 class PathTest
   extends FunSuite
@@ -239,5 +240,43 @@ class PathTest
 
     checkSerde(twice)
     checkSerde(nonExistent)
+  }
+
+  /**
+   * Force-reload [[FileSystemProvider]]s without [[FileSystems]] fixes
+   */
+  def defaultProviders: Seq[FileSystemProvider] = {
+    clearProviders
+    installedProviders
+  }
+
+  test("augment providers") {
+
+    /** Reset initialization state of [[FileSystems]] singleton */
+    val fcl = FileSystems.getClass
+    val field = fcl.getDeclaredField("_filesystemsInitialized")
+    field.setAccessible(true)
+    field.set(FileSystems, false)
+
+    val beforeProviders = defaultProviders
+
+    init()
+
+    val afterProviders = installedProviders
+
+    beforeProviders.find(_.getScheme == "jar") match {
+      case None ⇒
+      case Some(_: JarFileSystemProvider) ⇒
+        fail("Expected default 'jar'-scheme provider to not be org.hammerlab.paths.JarFileSystemProvider")
+      case Some(_: zipfs.ZipFileSystemProvider) ⇒
+      case Some(p) ⇒
+        fail(s"Unexpected 'jar'-scheme provider: $p")
+    }
+
+    afterProviders.find(_.getScheme == "jar") match {
+      case Some(_: JarFileSystemProvider) ⇒
+      case p ⇒
+        fail(s"Unexpected 'jar'-scheme provider: $p")
+    }
   }
 }

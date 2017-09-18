@@ -216,7 +216,7 @@ object Path {
       case _ ⇒
         Path(get(uri))
     }
-  
+
   implicit def toJava(path: Path): JPath = path.path
 
   implicit val parser: ArgParser[Path] =

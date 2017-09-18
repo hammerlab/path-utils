@@ -5,5 +5,8 @@ deps ++= Seq(
   commons_io,
   slf4j
 )
-testDeps := Seq(scalatest)
+testDeps := Seq(
+  scalatest,
+  log4j
+)
 addScala212
