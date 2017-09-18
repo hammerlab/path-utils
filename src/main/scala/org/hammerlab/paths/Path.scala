@@ -3,16 +3,25 @@ package org.hammerlab.paths
 import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintWriter }
 import java.net.{ URI, URISyntaxException }
 import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
-import java.nio.file.{ DirectoryStream, Files, Paths, Path ⇒ JPath }
+import java.nio.file.spi.FileSystemProvider
+import java.nio.file.{ DirectoryStream, FileSystemNotFoundException, Files, Paths, Path ⇒ JPath }
 
 import caseapp.core.ArgParser
 import caseapp.core.ArgParser.instance
+import com.sun.nio.zipfs.ZipPath
 import org.apache.commons.io.FilenameUtils.getExtension
 
 import scala.collection.JavaConverters._
 
+/**
+ * Wrapper around [[java.nio.file.Path]] that adds useful methods, is [[Serializable]], and fixes some
+ * provider/custom-scheme-loading issues (see [[FileSystems]]).
+ */
 case class Path(path: JPath) {
 
+  /**
+   * Delegate serialization to [[SerializablePath]]
+   */
   @throws[ObjectStreamException]
   def writeReplace: Object = {
     val sp = new SerializablePath
@@ -20,11 +29,21 @@ case class Path(path: JPath) {
     sp
   }
 
+  /**
+   * In general, delegate to [[URI]]'s `toString`.
+   *
+   * In case of relative paths, take a short-cut to preserve relative-ness.
+   */
   override def toString: String =
     if (path.isAbsolute)
       uri.toString
     else
-      path.toString
+      path match {
+        case _: ZipPath ⇒
+          uri.toString
+        case _ ⇒
+          path.toString
+      }
 
   def uri: URI = path.toUri
 
@@ -101,7 +120,7 @@ case class Path(path: JPath) {
   /**
    * Append `suffix` to the basename of this [[Path]].
    */
-  def +(suffix: String): Path = Path(toString + suffix)
+  def +(suffix: String): Path = Path(path.resolveSibling(basename + suffix))
 
   def /(basename: String): Path = Path(path.resolve(basename))
 
@@ -142,19 +161,61 @@ object Path {
     Paths.get(uri)
   }
 
+  def providers: Seq[FileSystemProvider] = {
+    init()
+    FileSystemProvider
+      .installedProviders()
+      .asScala
+  }
+
+  /**
+   * If a [[Path]] is instantiated from a "jar"-scheme [[URI]] before [[FileSystems.init()]] has been called, a
+   * [[FileSystemNotFoundException]] can occur.
+   *
+   * Get out in front of that here, forcing a [[FileSystems.init()]] if necessary.
+   */
+  def registerJarFilesystem(uri: URI): Unit = {
+    providers
+      .find(_.getScheme == "jar")
+      .foreach(
+        p ⇒
+          try {
+            p.getFileSystem(uri)
+          } catch {
+            case _: FileSystemNotFoundException ⇒
+              p.newFileSystem(
+                uri,
+                Map.empty[String, Any].asJava
+              )
+          }
+      )
+  }
+
   def apply(pathStr: String): Path =
     try {
       val uri = new URI(pathStr)
-      if (uri.getScheme == null)
-        new Path(get(pathStr))
-      else
-        Path(uri)
+      uri.getScheme match {
+        case null ⇒
+          new Path(get(pathStr))
+        case "jar" ⇒
+          registerJarFilesystem(uri)
+          Path(uri)
+        case _ ⇒
+          Path(uri)
+      }
     } catch {
       case _: URISyntaxException ⇒
         new Path(get(pathStr))
     }
 
-  def apply(uri: URI): Path = Path(get(uri))
+  def apply(uri: URI): Path =
+    uri.getScheme match {
+      case "jar" ⇒
+        registerJarFilesystem(uri)
+        Path(get(uri))
+      case _ ⇒
+        Path(get(uri))
+    }
 
   implicit def toJava(path: Path): JPath = path.path
 

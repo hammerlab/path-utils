@@ -1,11 +1,16 @@
 package org.hammerlab.paths
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
+import java.lang.Thread.currentThread
 import java.nio.file.Files
 import java.nio.file.Files.{ createDirectory, createTempDirectory }
+import java.nio.file.spi.FileSystemProvider
 
+import com.sun.nio.zipfs
+import org.hammerlab.paths.FileSystems._
 import org.scalatest.{ BeforeAndAfterAll, FunSuite, Matchers }
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 class PathTest
@@ -125,20 +130,28 @@ class PathTest
     )
   }
 
-  test("serialize path") {
-    val path = Path("abc/def")
+  def checkSerde(str: String, expectedBytes: Int): Unit =
+    checkSerde(Path(str), expectedBytes)
+
+  def checkSerde(path: Path, expectedBytes: Int = -1): Unit = {
     val baos = new ByteArrayOutputStream()
     val oos = new ObjectOutputStream(baos)
 
     oos.writeObject(path)
 
     val bytes = baos.toByteArray
-    bytes.length should be(94)
+
+    if (expectedBytes >= 0)
+      bytes.length should be(expectedBytes)
 
     val bais = new ByteArrayInputStream(bytes)
     val ois = new ObjectInputStream(bais)
 
     ois.readObject().asInstanceOf[Path] should be(path)
+  }
+
+  test("serialize path") {
+    checkSerde("abc/def", 94)
   }
 
   val dirs = ArrayBuffer[Path]()
@@ -196,5 +209,74 @@ class PathTest
 
     // Invalid characters for URI, interpret as local file
     Path("hdfs:///a b").uri.getScheme should be("file")
+  }
+
+  test("JarFilesystemProvider") {
+    FileSystemProvider.installedProviders().asScala.find(_.getScheme == "jar") match {
+      case Some(p: JarFileSystemProvider) ⇒
+      case Some(p) ⇒ fail(s"Expected JarFileSystemProvider, found $p")
+      case None ⇒ fail("Found no FileSystemProvider for 'jar' scheme")
+    }
+  }
+
+  test("jar files") {
+    val uri =
+      currentThread
+        .getContextClassLoader
+        .getResource("10.txt")
+        .toURI
+
+    val path = Path(uri)
+
+    path.exists should be(true)
+    path.lines.map(_.toInt).toList should be(1 to 10)
+
+    val twice = path + ".twice"
+    twice.exists should be(true)
+    twice.lines.map(_.toInt).toList should be((1 to 10) ++ (1 to 10))
+
+    val nonExistent = path + ".thrice"
+    nonExistent.exists should be(false)
+
+    checkSerde(twice)
+    checkSerde(nonExistent)
+  }
+
+  /**
+   * Force-reload [[FileSystemProvider]]s without [[FileSystems]] fixes
+   */
+  def defaultProviders: Seq[FileSystemProvider] = {
+    clearProviders
+    installedProviders
+  }
+
+  test("augment providers") {
+
+    /** Reset initialization state of [[FileSystems]] singleton */
+    val fcl = FileSystems.getClass
+    val field = fcl.getDeclaredField("_filesystemsInitialized")
+    field.setAccessible(true)
+    field.set(FileSystems, false)
+
+    val beforeProviders = defaultProviders
+
+    init()
+
+    val afterProviders = installedProviders
+
+    beforeProviders.find(_.getScheme == "jar") match {
+      case None ⇒
+      case Some(_: JarFileSystemProvider) ⇒
+        fail("Expected default 'jar'-scheme provider to not be org.hammerlab.paths.JarFileSystemProvider")
+      case Some(_: zipfs.ZipFileSystemProvider) ⇒
+      case Some(p) ⇒
+        fail(s"Unexpected 'jar'-scheme provider: $p")
+    }
+
+    afterProviders.find(_.getScheme == "jar") match {
+      case Some(_: JarFileSystemProvider) ⇒
+      case p ⇒
+        fail(s"Unexpected 'jar'-scheme provider: $p")
+    }
   }
 }
