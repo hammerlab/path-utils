@@ -4,11 +4,19 @@ import java.lang.reflect.Field
 import java.nio.file.spi.FileSystemProvider
 import java.util
 
+import com.sun.nio.zipfs
 import com.sun.nio.zipfs.{ ZipFileSystem, ZipFileSystemProvider }
 import grizzled.slf4j.Logging
 
 import scala.collection.JavaConverters._
 
+/**
+ * Hooks for augmenting the [[FileSystemProvider]]s that the JDK loads by default.
+ *
+ *   - Scala fails to pick up user-supplied providers: https://issues.scala-lang.org/browse/SI-10247
+ *   - Default [[zipfs.JarFileSystemProvider]] implementation is replaced with [[JarFileSystemProvider]], which defines
+ *     a missing method.
+ */
 object FileSystems
   extends Logging {
 
@@ -33,8 +41,7 @@ object FileSystems
   }
 
   private var _filesystemsInitialized = false
-  def init(): Unit = {
-
+  def init(): Unit =
     this.synchronized {
       if (!_filesystemsInitialized) {
         lock.synchronized {
@@ -43,7 +50,6 @@ object FileSystems
         }
       }
     }
-  }
 
   private def load(): Unit = {
 
@@ -53,9 +59,10 @@ object FileSystems
         loadingProvidersField.set(null, false)
         val providers =
           installedProvidersField
-          .get(null)
-          .asInstanceOf[util.List[FileSystemProvider]]
+            .get(null)
+            .asInstanceOf[util.List[FileSystemProvider]]
 
+        // null out the field for now so that it will register as needing to be reloaded later
         installedProvidersField.set(null, null)
 
         providers.asScala
@@ -65,13 +72,16 @@ object FileSystems
         providers
       }
 
-    /** Hack to pick up [[FileSystemProvider]] implementations; see https://issues.scala-lang.org/browse/SI-10247. */
+    /**
+     * Replace the system classloader with the current thread's, for use during a second round of loading installed
+     * providers.
+     *
+     * Hack to pick up [[FileSystemProvider]] implementations; see https://issues.scala-lang.org/browse/SI-10247.
+     */
     val scl = classOf[ClassLoader].getDeclaredField("scl")
     scl.setAccessible(true)
     val prevClassLoader = ClassLoader.getSystemClassLoader
     scl.set(null, Thread.currentThread().getContextClassLoader)
-
-
 
     var newClassLoaderProviders =
       FileSystemProvider

@@ -13,8 +13,15 @@ import org.apache.commons.io.FilenameUtils.getExtension
 
 import scala.collection.JavaConverters._
 
+/**
+ * Wrapper around [[java.nio.file.Path]] that adds useful methods, is [[Serializable]], and fixes some
+ * provider/custom-scheme-loading issues (see [[FileSystems]]).
+ */
 case class Path(path: JPath) {
 
+  /**
+   * Delegate serialization to [[SerializablePath]]
+   */
   @throws[ObjectStreamException]
   def writeReplace: Object = {
     val sp = new SerializablePath
@@ -22,6 +29,11 @@ case class Path(path: JPath) {
     sp
   }
 
+  /**
+   * In general, delegate to [[URI]]'s `toString`.
+   *
+   * In case of relative paths, take a short-cut to preserve relative-ness.
+   */
   override def toString: String =
     if (path.isAbsolute)
       uri.toString
@@ -156,6 +168,12 @@ object Path {
       .asScala
   }
 
+  /**
+   * If a [[Path]] is instantiated from a "jar"-scheme [[URI]] before [[FileSystems.init()]] has been called, a
+   * [[FileSystemNotFoundException]] can occur.
+   *
+   * Get out in front of that here, forcing a [[FileSystems.init()]] if necessary.
+   */
   def registerJarFilesystem(uri: URI): Unit = {
     providers
       .find(_.getScheme == "jar")
@@ -198,8 +216,7 @@ object Path {
       case _ ⇒
         Path(get(uri))
     }
-
-
+  
   implicit def toJava(path: Path): JPath = path.path
 
   implicit val parser: ArgParser[Path] =
