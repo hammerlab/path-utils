@@ -1,5 +1,6 @@
 package org.hammerlab.paths
 
+import java.lang.Thread.currentThread
 import java.lang.reflect.Field
 import java.nio.file.spi.FileSystemProvider
 import java.util
@@ -57,13 +58,11 @@ object FileSystems
   def clearProviders: Seq[FileSystemProvider] = {
     loadingProvidersField.set(null, false)
 
-    val providers =
-      FileSystemProvider
-        .installedProviders()
-        .asScala
+    val providers = installedProviders
 
     // null out the field for now so that it will register as needing to be reloaded later
     installedProvidersField.set(null, null)
+    loadingProvidersField.set(null, false)
 
     providers
   }
@@ -80,7 +79,7 @@ object FileSystems
         info("FileSystems already loaded! forcing reload")
         clearProviders
       } else {
-        val providers = installedProviders
+        val providers = clearProviders
         info(s"Loading filesystems, starting with: ${providers.map(_.getScheme).mkString(",")}")
         providers
       }
@@ -94,16 +93,16 @@ object FileSystems
     val scl = classOf[ClassLoader].getDeclaredField("scl")
     scl.setAccessible(true)
     val prevClassLoader = ClassLoader.getSystemClassLoader
-    scl.set(null, Thread.currentThread().getContextClassLoader)
+    scl.set(null, currentThread().getContextClassLoader)
 
     var newClassLoaderProviders =
       installedProviders
-      .map(
-          p ⇒
-            p.getScheme →
-              p
-        )
-      .toMap
+        .map(
+            p ⇒
+              p.getScheme →
+                p
+          )
+        .toMap
 
     val existingProvidersMap =
       existingProviders

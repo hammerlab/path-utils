@@ -2,9 +2,14 @@ package org.hammerlab.paths
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
 import java.lang.Thread.currentThread
-import java.nio.file.Files
+import java.net.URI
+import java.nio.channels.SeekableByteChannel
+import java.nio.file
 import java.nio.file.Files.{ createDirectory, createTempDirectory }
+import java.nio.file.attribute.{ BasicFileAttributes, FileAttribute, FileAttributeView }
 import java.nio.file.spi.FileSystemProvider
+import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileSystem, Files, LinkOption, OpenOption }
+import java.util
 
 import com.sun.nio.zipfs
 import org.hammerlab.paths.FileSystems._
@@ -278,5 +283,35 @@ class PathTest
       case p ⇒
         fail(s"Unexpected 'jar'-scheme provider: $p")
     }
+
+    afterProviders.map(_.getScheme).toSet should be(
+      Set(
+        "file",
+        "jar",
+        "foo"
+      )
+    )
   }
+}
+
+class FooFileSystemProvider extends FileSystemProvider {
+  override def getScheme: String = "foo"
+
+  override def newByteChannel(path: file.Path, options: util.Set[_ <: OpenOption], attrs: FileAttribute[_]*): SeekableByteChannel = ???
+  override def isSameFile(path: file.Path, path2: file.Path): Boolean = ???
+  override def getFileStore(path: file.Path): FileStore = ???
+  override def getFileAttributeView[V <: FileAttributeView](path: file.Path, `type`: Class[V], options: LinkOption*): V = ???
+  override def delete(path: file.Path): Unit = ???
+  override def setAttribute(path: file.Path, attribute: String, value: scala.Any, options: LinkOption*): Unit = ???
+  override def readAttributes[A <: BasicFileAttributes](path: file.Path, `type`: Class[A], options: LinkOption*): A = ???
+  override def readAttributes(path: file.Path, attributes: String, options: LinkOption*): util.Map[String, AnyRef] = ???
+  override def getPath(uri: URI): file.Path = ???
+  override def createDirectory(dir: file.Path, attrs: FileAttribute[_]*): Unit = ???
+  override def copy(source: file.Path, target: file.Path, options: CopyOption*): Unit = ???
+  override def move(source: file.Path, target: file.Path, options: CopyOption*): Unit = ???
+  override def newFileSystem(uri: URI, env: util.Map[String, _]): FileSystem = ???
+  override def newDirectoryStream(dir: file.Path, filter: DirectoryStream.Filter[_ >: file.Path]): DirectoryStream[file.Path] = ???
+  override def getFileSystem(uri: URI): FileSystem = ???
+  override def checkAccess(path: file.Path, modes: AccessMode*): Unit = ???
+  override def isHidden(path: file.Path): Boolean = ???
 }

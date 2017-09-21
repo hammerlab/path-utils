@@ -1,5 +1,5 @@
 name := "paths"
-version := "1.3.0-SNAPSHOT"
+version := "1.3.1-SNAPSHOT"
 deps ++= Seq(
   case_app,
   commons_io,
