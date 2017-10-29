@@ -43,11 +43,13 @@ object FileSystems
 
   private var _filesystemsInitialized = false
   def init(): Unit =
-    this.synchronized {
-      if (!_filesystemsInitialized) {
-        lock.synchronized {
-          load()
-          _filesystemsInitialized = true
+    if (!_filesystemsInitialized) {
+      this.synchronized {
+        if (!_filesystemsInitialized) {
+          lock.synchronized {
+            load()
+            _filesystemsInitialized = true
+          }
         }
       }
     }
