@@ -68,6 +68,7 @@ case class Path(path: JPath) {
 
   def endsWith(suffix: String): Boolean = basename.endsWith(suffix)
 
+  def isFile: Boolean = Files.isRegularFile(path)
   def isDirectory: Boolean = Files.isDirectory(path)
 
   def walk: Iterator[Path] =
@@ -123,6 +124,7 @@ case class Path(path: JPath) {
   def +(suffix: String): Path = Path(path.resolveSibling(basename + suffix))
 
   def /(basename: String): Path = Path(path.resolve(basename))
+  def /(basename: Symbol): Path = Path(path.resolve(basename.name))
 
   def lines: Iterator[String] =
     Files

@@ -28,7 +28,7 @@ class PathTest
   test("extensions") {
     "abc.def".extension should be("def")
     Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
-    Path("abc.def") / "ghi" should be(Path("abc.def/ghi"))
+    Path("abc.def") / 'ghi should be(Path("abc.def/ghi"))
 
     "/abc/def.gh.ij".extension should be("ij")
     "file:///foo/bar.baz".extension should be("baz")
@@ -52,6 +52,8 @@ class PathTest
     createDirectory(bar)
 
     assert(bar.exists)
+    assert(bar.isDirectory)
+    assert(!bar.isFile)
 
     val foo = dir / "foo"
 
