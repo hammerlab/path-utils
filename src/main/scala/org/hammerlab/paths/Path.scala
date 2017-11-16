@@ -72,22 +72,21 @@ case class Path(path: JPath) {
   def isDirectory: Boolean = Files.isDirectory(path)
 
   def walk: Iterator[Path] =
-    (if (exists)
-      Iterator(this)
-    else
+    if (!exists)
       Iterator()
-    ) ++
-      Files.list(path)
-        .iterator()
-        .asScala
-        .map(Path(_))
-        .flatMap(
-          p ⇒
-            if (p.isDirectory)
-              p.walk
-            else
-              Iterator(p)
-        )
+    else
+      Iterator(this) ++
+        Files.list(path)
+          .iterator()
+          .asScala
+          .map(Path(_))
+          .flatMap(
+            p ⇒
+              if (p.isDirectory)
+                p.walk
+              else
+                Iterator(p)
+          )
 
   def delete(recursive: Boolean = false): Unit = {
     if (recursive) {
