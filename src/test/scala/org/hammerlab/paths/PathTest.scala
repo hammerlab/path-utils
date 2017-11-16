@@ -25,10 +25,13 @@ class PathTest
 
   implicit def strToPath(str: String): Path = Path(str)
 
+  // Use the import API
+  import hammerlab.path._
+
   test("extensions") {
     "abc.def".extension should be("def")
     Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
-    Path("abc.def") / "ghi" should be(Path("abc.def/ghi"))
+    Path("abc.def") / 'ghi should be(Path("abc.def/ghi"))
 
     "/abc/def.gh.ij".extension should be("ij")
     "file:///foo/bar.baz".extension should be("baz")
@@ -37,7 +40,13 @@ class PathTest
 
     val dir = tmpPath(suffix = ".foo")
     Files.createDirectory(dir)
+    dir.exists should be(true)
     dir.extension should be("foo")
+    dir.endsWith(".foo") should be(true)
+    dir.endsWith("foo") should be(true)
+    dir.endsWith("fo") should be(false)
+    dir.delete(recursive = false)
+    dir.exists should be(false)
   }
 
   test("removals") {
@@ -52,6 +61,8 @@ class PathTest
     createDirectory(bar)
 
     assert(bar.exists)
+    assert(bar.isDirectory)
+    assert(!bar.isFile)
 
     val foo = dir / "foo"
 
@@ -95,6 +106,8 @@ class PathTest
     assert(!bar.exists)
     assert(!baz.exists)
     assert(!dir.exists)
+
+    dir.walk.toList should be(Nil)
   }
 
   test("read/write string round-trip") {
@@ -224,17 +237,25 @@ class PathTest
     }
   }
 
-  test("jar files") {
-    val uri =
+  def resource(name: String): Path =
+    Path(
       currentThread
         .getContextClassLoader
-        .getResource("10.txt")
+        .getResource(name)
         .toURI
+    )
 
-    val path = Path(uri)
+  test("jar files") {
+    val path = resource("10.txt")
 
     path.exists should be(true)
     path.lines.map(_.toInt).toList should be(1 to 10)
+    path.size should be(21)
+
+    /** Use [[JarFileSystemProvider.newByteChannel]] */
+    val ch = Files.newByteChannel(path)
+    ch.size() should be(21)
+    ch.close()
 
     val twice = path + ".twice"
     twice.exists should be(true)
@@ -245,6 +266,18 @@ class PathTest
 
     checkSerde(twice)
     checkSerde(nonExistent)
+  }
+
+  test("glob") {
+    resource("test.jar")
+      .list("10*")
+      .map(_.basename)
+      .toSet should be(
+      Set(
+        "10.txt",
+        "10.txt.twice"
+      )
+    )
   }
 
   /**

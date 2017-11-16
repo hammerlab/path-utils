@@ -68,25 +68,25 @@ case class Path(path: JPath) {
 
   def endsWith(suffix: String): Boolean = basename.endsWith(suffix)
 
+  def isFile: Boolean = Files.isRegularFile(path)
   def isDirectory: Boolean = Files.isDirectory(path)
 
   def walk: Iterator[Path] =
-    (if (exists)
-      Iterator(this)
-    else
+    if (!exists)
       Iterator()
-    ) ++
-      Files.list(path)
-        .iterator()
-        .asScala
-        .map(Path(_))
-        .flatMap(
-          p ⇒
-            if (p.isDirectory)
-              p.walk
-            else
-              Iterator(p)
-        )
+    else
+      Iterator(this) ++
+        Files.list(path)
+          .iterator()
+          .asScala
+          .map(Path(_))
+          .flatMap(
+            p ⇒
+              if (p.isDirectory)
+                p.walk
+              else
+                Iterator(p)
+          )
 
   def delete(recursive: Boolean = false): Unit = {
     if (recursive) {
@@ -123,6 +123,7 @@ case class Path(path: JPath) {
   def +(suffix: String): Path = Path(path.resolveSibling(basename + suffix))
 
   def /(basename: String): Path = Path(path.resolve(basename))
+  def /(basename: Symbol): Path = Path(path.resolve(basename.name))
 
   def lines: Iterator[String] =
     Files
