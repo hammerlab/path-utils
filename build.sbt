@@ -9,5 +9,4 @@ testDeps := Seq(
   scalatest,
   log4j
 )
-addScala212
 github.repo("path-utils")
