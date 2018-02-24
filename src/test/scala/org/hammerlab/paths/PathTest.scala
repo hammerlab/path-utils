@@ -1,6 +1,6 @@
 package org.hammerlab.paths
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, IOException, ObjectInputStream, ObjectOutputStream }
 import java.lang.Thread.currentThread
 import java.net.URI
 import java.nio.channels.SeekableByteChannel
@@ -8,7 +8,7 @@ import java.nio.file
 import java.nio.file.Files.{ createDirectory, createTempDirectory }
 import java.nio.file.attribute.{ BasicFileAttributes, FileAttribute, FileAttributeView }
 import java.nio.file.spi.FileSystemProvider
-import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileSystem, Files, LinkOption, OpenOption }
+import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileSystem, FileSystemException, Files, LinkOption, OpenOption }
 import java.util
 
 import com.sun.nio.zipfs
@@ -31,7 +31,8 @@ class PathTest
   test("extensions") {
     "abc.def".extension should be("def")
     Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
-    Path("abc.def") / 'ghi should be(Path("abc.def/ghi"))
+    'abc / 'ghi should be(Path("abc/ghi"))
+    "abc.def" / 'ghi should be(Path("abc.def/ghi"))
 
     "/abc/def.gh.ij".extension should be("ij")
     "file:///foo/bar.baz".extension should be("baz")
@@ -47,6 +48,21 @@ class PathTest
     dir.endsWith("fo") should be(false)
     dir.delete(recursive = false)
     dir.exists should be(false)
+  }
+
+  test("basename") {
+    val dir = tmpDir()
+
+    def check(path: Path, withExtension: String, withoutExtension: String): Unit = {
+      path.basename                    should be(withExtension)
+      path.basename(extension =  true) should be(withExtension)
+      path.basename(extension = false) should be(withoutExtension)
+      path.basenameNoExtension         should be(withoutExtension)
+    }
+
+    check(dir / 'foo, "foo", "foo")
+    check(dir / "bar.baz", "bar.baz", "bar")
+    check(dir / 'abc / "def.ghi.jkl", "def.ghi.jkl", "def.ghi")
   }
 
   test("removals") {
@@ -84,16 +100,21 @@ class PathTest
 
     assert(baz.exists)
 
-    dir.list.toSeq should be(
-      Seq(
+    dir.list.toSet should be(
+      Set(
         bar,
         foo
       )
     )
 
-    dir.walk.toSeq should be(
-      Seq(
-        dir,
+    val head :: tail = dir.walk.toList
+
+    // The parent directory should be first…
+    head should be(dir)
+
+    // …but after that the order isn't enformced
+    tail.toSet should be(
+      Set(
         bar,
         baz,
         foo
@@ -114,6 +135,48 @@ class PathTest
     val path = tmpPath()
     path.write("yay")
     path.read should be("yay")
+  }
+
+  test("outputstream mkdirs") {
+    val dir = tmpPath()
+    val path = dir / 'a / 'b
+
+    intercept[FileSystemException] {
+      path.outputStream
+    }
+
+    intercept[FileSystemException] {
+      path.outputStream(mkdirs = false)
+    }
+
+    val os = path.outputStream(mkdirs = true)
+    os.write("yay".getBytes)
+    os.close()
+    path.read should be("yay")
+  }
+
+  test("printstream mkdirs") {
+    val dir = tmpPath()
+    val path = dir / 'a / 'b
+    intercept[FileSystemException] {
+      path.printStream
+    }
+
+    intercept[FileSystemException] {
+      path.printStream(mkdirs = false)
+    }
+
+    val ps = path.printStream(mkdirs = true)
+    ps.println("yay")
+    ps.close()
+    path.read should be("yay\n")
+
+    // works fine when directories already exist
+    val path2 = dir / 'a / 'c
+    val ps2 = path.printStream(mkdirs = true)
+    ps2.println("woo")
+    ps2.close()
+    path.read should be("woo\n")
   }
 
   test("read/write lines round-trip") {

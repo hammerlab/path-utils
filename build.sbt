@@ -1,5 +1,5 @@
 name := "paths"
-r"1.4.0"
+v"1.5.0"
 dep(
   case_app,
   commons_io,
