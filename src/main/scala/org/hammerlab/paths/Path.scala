@@ -2,12 +2,12 @@ package org.hammerlab.paths
 
 import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintStream, PrintWriter }
 import java.net.{ URI, URISyntaxException }
-import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes, createDirectories }
+import java.nio.file.Files.{ createDirectories, newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
 import java.nio.file.spi.FileSystemProvider
-import java.nio.file.{ DirectoryStream, FileSystemNotFoundException, Files, Paths, Path ⇒ JPath }
+import java.nio.file.{ DirectoryStream, FileSystemNotFoundException, Files, Paths, StandardOpenOption, Path ⇒ JPath }
+import StandardOpenOption.{ APPEND, CREATE }
 
-import caseapp.core.ArgParser
-import caseapp.core.ArgParser.instance
+import caseapp.core.argparser._
 import com.sun.nio.zipfs.ZipPath
 import org.apache.commons.io.FilenameUtils.getExtension
 
@@ -128,6 +128,15 @@ case class Path(path: JPath) {
   def outputStream: OutputStream = newOutputStream(path)
   def  printStream:  PrintStream = new PrintStream(newOutputStream(path))
 
+  def outputStream(append: Boolean, mkdirs: Boolean = false): OutputStream = {
+    if (mkdirs)
+      this.mkdirs
+
+    if (append)
+      newOutputStream(path, CREATE, APPEND)
+    else
+      newOutputStream(path)
+  }
   def outputStream(mkdirs: Boolean): OutputStream = {
     if (mkdirs)
       this.mkdirs
@@ -135,6 +144,13 @@ case class Path(path: JPath) {
     newOutputStream(path)
   }
 
+  def printStream(append: Boolean, mkdirs: Boolean = false): PrintStream =
+    new PrintStream(
+      outputStream(
+        append,
+        mkdirs
+      )
+    )
   def printStream(mkdirs: Boolean): PrintStream =
     new PrintStream(
       outputStream(
@@ -255,7 +271,7 @@ object Path {
   implicit def toJava(path: Path): JPath = path.path
 
   implicit val parser: ArgParser[Path] =
-    instance("path") {
+    SimpleArgParser.from("path") {
       str ⇒
         Right(
           Path(str)

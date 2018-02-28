@@ -1,6 +1,6 @@
 package org.hammerlab.paths
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, IOException, ObjectInputStream, ObjectOutputStream }
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
 import java.lang.Thread.currentThread
 import java.net.URI
 import java.nio.channels.SeekableByteChannel
@@ -245,6 +245,8 @@ class PathTest
 
   /**
    * Return a [[Path]] to a temporary file that has not yet been created.
+   *
+   * Duplicated from org.hammerlab.test.Suite because org.hammerlab:base depends on this module
    */
   def tmpPath(prefix: String = this.getClass.getSimpleName,
               suffix: String = ""): Path =
@@ -387,6 +389,27 @@ class PathTest
         "foo"
       )
     )
+  }
+
+  test("printstream append") {
+    val dir = tmpDir()
+    val path = dir / 'abc / 'def
+
+    {
+      val ps = path.printStream(append = true, mkdirs = true)
+      ps.println("yay")
+      ps.close()
+    }
+
+    path.read should be("yay\n")
+
+    {
+      val ps = path.printStream(append = true)
+      ps.println("yay2")
+      ps.close()
+    }
+
+    path.read should be("yay\nyay2\n")
   }
 }
 
