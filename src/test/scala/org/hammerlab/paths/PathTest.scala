@@ -11,6 +11,7 @@ import java.nio.file.spi.FileSystemProvider
 import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileSystem, FileSystemException, Files, LinkOption, OpenOption }
 import java.util
 
+import caseapp.core.argparser.ArgParser
 import com.sun.nio.zipfs
 import org.hammerlab.paths.FileSystems._
 import org.scalatest.{ BeforeAndAfterAll, FunSuite, Matchers }
@@ -28,16 +29,22 @@ class PathTest
   // Use the import API
   import hammerlab.path._
 
+  test("syntax") {
+    'abc / "def.ghi" should be(Path("abc/def.ghi"))
+    'abc / 'def should be(Path("abc/def"))
+    "abc" / "def.ghi" should be(Path("abc/def.ghi"))
+    "abc" / 'def should be(Path("abc/def"))
+
+    Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
+    Path("file:///foo/bar.baz") + ".qux" should be(Path("file:///foo/bar.baz.qux"))
+    Path("file:///foo/bar.baz") / "qux" should be(Path("file:///foo/bar.baz/qux"))
+  }
+
   test("extensions") {
     "abc.def".extension should be("def")
-    Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
-    'abc / 'ghi should be(Path("abc/ghi"))
-    "abc.def" / 'ghi should be(Path("abc.def/ghi"))
 
     "/abc/def.gh.ij".extension should be("ij")
     "file:///foo/bar.baz".extension should be("baz")
-    Path("file:///foo/bar.baz") + ".qux" should be(Path("file:///foo/bar.baz.qux"))
-    Path("file:///foo/bar.baz") / "qux" should be(Path("file:///foo/bar.baz/qux"))
 
     val dir = tmpPath(suffix = ".foo")
     Files.createDirectory(dir)
@@ -410,9 +417,25 @@ class PathTest
     }
 
     path.read should be("yay\nyay2\n")
+
+    {
+      val ps = path.printStream(append = false)
+      ps.println("yay3")
+      ps.close()
+    }
+
+    // test reading from InputStream
+    scala.io.Source.fromInputStream(path.inputStream).mkString should be("yay3\n")
+  }
+
+  test("cli parse") {
+    ArgParser[Path].apply(None, "file:///a/b/c") should be(Right(Path("file:///a/b/c")))
   }
 }
 
+/**
+ * Dummy [[FileSystemProvider]] registered in META-INF/services, for checking that custom providers are loaded correctly
+ */
 class FooFileSystemProvider extends FileSystemProvider {
   override def getScheme: String = "foo"
 
