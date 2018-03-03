@@ -8,9 +8,10 @@ import java.nio.file
 import java.nio.file.Files.{ createDirectory, createTempDirectory }
 import java.nio.file.attribute.{ BasicFileAttributes, FileAttribute, FileAttributeView }
 import java.nio.file.spi.FileSystemProvider
-import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileSystem, Files, LinkOption, OpenOption }
+import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileSystem, FileSystemException, Files, LinkOption, OpenOption }
 import java.util
 
+import caseapp.core.argparser.ArgParser
 import com.sun.nio.zipfs
 import org.hammerlab.paths.FileSystems._
 import org.scalatest.{ BeforeAndAfterAll, FunSuite, Matchers }
@@ -28,15 +29,22 @@ class PathTest
   // Use the import API
   import hammerlab.path._
 
+  test("syntax") {
+    'abc / "def.ghi" should be(Path("abc/def.ghi"))
+    'abc / 'def should be(Path("abc/def"))
+    "abc" / "def.ghi" should be(Path("abc/def.ghi"))
+    "abc" / 'def should be(Path("abc/def"))
+
+    Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
+    Path("file:///foo/bar.baz") + ".qux" should be(Path("file:///foo/bar.baz.qux"))
+    Path("file:///foo/bar.baz") / "qux" should be(Path("file:///foo/bar.baz/qux"))
+  }
+
   test("extensions") {
     "abc.def".extension should be("def")
-    Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
-    Path("abc.def") / 'ghi should be(Path("abc.def/ghi"))
 
     "/abc/def.gh.ij".extension should be("ij")
     "file:///foo/bar.baz".extension should be("baz")
-    Path("file:///foo/bar.baz") + ".qux" should be(Path("file:///foo/bar.baz.qux"))
-    Path("file:///foo/bar.baz") / "qux" should be(Path("file:///foo/bar.baz/qux"))
 
     val dir = tmpPath(suffix = ".foo")
     Files.createDirectory(dir)
@@ -47,6 +55,21 @@ class PathTest
     dir.endsWith("fo") should be(false)
     dir.delete(recursive = false)
     dir.exists should be(false)
+  }
+
+  test("basename") {
+    val dir = tmpDir()
+
+    def check(path: Path, withExtension: String, withoutExtension: String): Unit = {
+      path.basename                    should be(withExtension)
+      path.basename(extension =  true) should be(withExtension)
+      path.basename(extension = false) should be(withoutExtension)
+      path.basenameNoExtension         should be(withoutExtension)
+    }
+
+    check(dir / 'foo, "foo", "foo")
+    check(dir / "bar.baz", "bar.baz", "bar")
+    check(dir / 'abc / "def.ghi.jkl", "def.ghi.jkl", "def.ghi")
   }
 
   test("removals") {
@@ -84,16 +107,21 @@ class PathTest
 
     assert(baz.exists)
 
-    dir.list.toSeq should be(
-      Seq(
+    dir.list.toSet should be(
+      Set(
         bar,
         foo
       )
     )
 
-    dir.walk.toSeq should be(
-      Seq(
-        dir,
+    val head :: tail = dir.walk.toList
+
+    // The parent directory should be first…
+    head should be(dir)
+
+    // …but after that the order isn't enformced
+    tail.toSet should be(
+      Set(
         bar,
         baz,
         foo
@@ -114,6 +142,48 @@ class PathTest
     val path = tmpPath()
     path.write("yay")
     path.read should be("yay")
+  }
+
+  test("outputstream mkdirs") {
+    val dir = tmpPath()
+    val path = dir / 'a / 'b
+
+    intercept[FileSystemException] {
+      path.outputStream
+    }
+
+    intercept[FileSystemException] {
+      path.outputStream(mkdirs = false)
+    }
+
+    val os = path.outputStream(mkdirs = true)
+    os.write("yay".getBytes)
+    os.close()
+    path.read should be("yay")
+  }
+
+  test("printstream mkdirs") {
+    val dir = tmpPath()
+    val path = dir / 'a / 'b
+    intercept[FileSystemException] {
+      path.printStream
+    }
+
+    intercept[FileSystemException] {
+      path.printStream(mkdirs = false)
+    }
+
+    val ps = path.printStream(mkdirs = true)
+    ps.println("yay")
+    ps.close()
+    path.read should be("yay\n")
+
+    // works fine when directories already exist
+    val path2 = dir / 'a / 'c
+    val ps2 = path.printStream(mkdirs = true)
+    ps2.println("woo")
+    ps2.close()
+    path.read should be("woo\n")
   }
 
   test("read/write lines round-trip") {
@@ -182,6 +252,8 @@ class PathTest
 
   /**
    * Return a [[Path]] to a temporary file that has not yet been created.
+   *
+   * Duplicated from org.hammerlab.test.Suite because org.hammerlab:base depends on this module
    */
   def tmpPath(prefix: String = this.getClass.getSimpleName,
               suffix: String = ""): Path =
@@ -325,8 +397,45 @@ class PathTest
       )
     )
   }
+
+  test("printstream append") {
+    val dir = tmpDir()
+    val path = dir / 'abc / 'def
+
+    {
+      val ps = path.printStream(append = true, mkdirs = true)
+      ps.println("yay")
+      ps.close()
+    }
+
+    path.read should be("yay\n")
+
+    {
+      val ps = path.printStream(append = true)
+      ps.println("yay2")
+      ps.close()
+    }
+
+    path.read should be("yay\nyay2\n")
+
+    {
+      val ps = path.printStream(append = false)
+      ps.println("yay3")
+      ps.close()
+    }
+
+    // test reading from InputStream
+    scala.io.Source.fromInputStream(path.inputStream).mkString should be("yay3\n")
+  }
+
+  test("cli parse") {
+    ArgParser[Path].apply(None, "file:///a/b/c") should be(Right(Path("file:///a/b/c")))
+  }
 }
 
+/**
+ * Dummy [[FileSystemProvider]] registered in META-INF/services, for checking that custom providers are loaded correctly
+ */
 class FooFileSystemProvider extends FileSystemProvider {
   override def getScheme: String = "foo"
 

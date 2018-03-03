@@ -1,13 +1,13 @@
 package org.hammerlab.paths
 
-import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintWriter }
+import java.io.{ InputStream, ObjectStreamException, OutputStream, PrintStream, PrintWriter }
 import java.net.{ URI, URISyntaxException }
-import java.nio.file.Files.{ newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
+import java.nio.file.Files.{ createDirectories, newDirectoryStream, newInputStream, newOutputStream, readAllBytes }
 import java.nio.file.spi.FileSystemProvider
-import java.nio.file.{ DirectoryStream, FileSystemNotFoundException, Files, Paths, Path ⇒ JPath }
+import java.nio.file.{ DirectoryStream, FileSystemNotFoundException, Files, Paths, StandardOpenOption, Path ⇒ JPath }
+import StandardOpenOption.{ APPEND, CREATE }
 
-import caseapp.core.ArgParser
-import caseapp.core.ArgParser.instance
+import caseapp.core.argparser._
 import com.sun.nio.zipfs.ZipPath
 import org.apache.commons.io.FilenameUtils.getExtension
 
@@ -63,6 +63,18 @@ case class Path(path: JPath) {
       Path(path.toAbsolutePath).depth
 
   def basename: String = path.getFileName.toString
+  def basenameNoExtension: String = {
+    val xtn = extension
+    if (xtn.isEmpty)
+      basename
+    else
+      basename.dropRight(xtn.length + 1)
+  }
+  def basename(extension: Boolean = true): String =
+    if (extension)
+      basename
+    else
+      basenameNoExtension
 
   def size: Long = Files.size(path)
 
@@ -105,8 +117,46 @@ case class Path(path: JPath) {
     Files.delete(path)
   }
 
-  def inputStream: InputStream = newInputStream(path)
+  def mkdirs: Unit =
+    parentOpt.foreach(
+      parent ⇒
+        if (!parent.exists)
+          createDirectories(parent)
+    )
+
+  def  inputStream:  InputStream = newInputStream(path)
   def outputStream: OutputStream = newOutputStream(path)
+  def  printStream:  PrintStream = new PrintStream(newOutputStream(path))
+
+  def outputStream(append: Boolean, mkdirs: Boolean = false): OutputStream = {
+    if (mkdirs)
+      this.mkdirs
+
+    if (append)
+      newOutputStream(path, CREATE, APPEND)
+    else
+      newOutputStream(path)
+  }
+  def outputStream(mkdirs: Boolean): OutputStream = {
+    if (mkdirs)
+      this.mkdirs
+
+    newOutputStream(path)
+  }
+
+  def printStream(append: Boolean, mkdirs: Boolean = false): PrintStream =
+    new PrintStream(
+      outputStream(
+        append,
+        mkdirs
+      )
+    )
+  def printStream(mkdirs: Boolean): PrintStream =
+    new PrintStream(
+      outputStream(
+        mkdirs
+      )
+    )
 
   private implicit def toScala(dirStream: DirectoryStream[JPath]): Iterator[Path] =
     dirStream
@@ -221,7 +271,7 @@ object Path {
   implicit def toJava(path: Path): JPath = path.path
 
   implicit val parser: ArgParser[Path] =
-    instance("path") {
+    SimpleArgParser.from("path") {
       str ⇒
         Right(
           Path(str)
