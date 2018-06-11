@@ -1,8 +1,8 @@
 name := "paths"
-v"1.5.0"
+v"1.5.1"
 dep(
   case_app,
-  commons_io,
+  commons.io,
   slf4j
 )
 testDeps := Seq(
