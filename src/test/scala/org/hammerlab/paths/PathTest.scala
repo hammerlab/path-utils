@@ -1,6 +1,6 @@
 package org.hammerlab.paths
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, FileNotFoundException, ObjectInputStream, ObjectOutputStream }
 import java.lang.Thread.currentThread
 import java.net.URI
 import java.nio.channels.SeekableByteChannel
@@ -12,17 +12,15 @@ import java.nio.file.{ AccessMode, CopyOption, DirectoryStream, FileStore, FileS
 import java.util
 
 import caseapp.core.argparser.ArgParser
+import cats.Eq
 import com.sun.nio.zipfs
 import org.hammerlab.paths.FileSystems._
-import org.scalatest.{ BeforeAndAfterAll, FunSuite, Matchers }
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 class PathTest
-  extends FunSuite
-    with Matchers
-    with BeforeAndAfterAll {
+  extends hammerlab.Suite {
 
   implicit def strToPath(str: String): Path = Path(str)
 
@@ -30,14 +28,39 @@ class PathTest
   import hammerlab.path._
 
   test("syntax") {
-    'abc / "def.ghi" should be(Path("abc/def.ghi"))
-    'abc / 'def should be(Path("abc/def"))
+    'abc / "def.ghi"  should be(Path("abc/def.ghi"))
+    'abc / 'def       should be(Path("abc/def"))
     "abc" / "def.ghi" should be(Path("abc/def.ghi"))
-    "abc" / 'def should be(Path("abc/def"))
+    "abc" / 'def      should be(Path("abc/def"))
 
     Path("abc.def") + ".ghi" should be(Path("abc.def.ghi"))
     Path("file:///foo/bar.baz") + ".qux" should be(Path("file:///foo/bar.baz.qux"))
-    Path("file:///foo/bar.baz") / "qux" should be(Path("file:///foo/bar.baz/qux"))
+    Path("file:///foo/bar.baz") /  "qux" should be(Path("file:///foo/bar.baz/qux"))
+
+    implicit val fileNotFoundExceptionEq: Eq[FileNotFoundException] =
+      new Eq[FileNotFoundException] {
+        override def eqv(x: FileNotFoundException, y: FileNotFoundException): Boolean = true
+      }
+
+    val tmp = tmpPath()
+
+    ==(
+      tmp ? 'foo,
+      Left(
+        new FileNotFoundException
+      )
+    )
+
+    (tmp / 'foo) mkdirs
+
+    (tmp / 'foo) write "abc"
+
+    ==(
+      tmp ? 'foo,
+      Right(
+        tmp / 'foo
+      )
+    )
   }
 
   test("extensions") {

@@ -1,5 +1,6 @@
 package org.hammerlab.paths
 
+import java.lang.ClassLoader.getSystemClassLoader
 import java.lang.Thread.currentThread
 import java.lang.reflect.Field
 import java.nio.file.spi.FileSystemProvider
@@ -94,7 +95,7 @@ object FileSystems
      */
     val scl = classOf[ClassLoader].getDeclaredField("scl")
     scl.setAccessible(true)
-    val prevClassLoader = ClassLoader.getSystemClassLoader
+    val prevClassLoader = getSystemClassLoader
     scl.set(null, currentThread().getContextClassLoader)
 
     var newClassLoaderProviders =

@@ -1,12 +1,10 @@
 name := "paths"
-v"1.5.0"
+v"1.6.0"
 dep(
   case_app,
-  commons_io,
-  slf4j
+  commons.io,
+  hammerlab.types % "1.4.0",
+  slf4j,
 )
-testDeps := Seq(
-  scalatest,
-  log4j
-)
+testDeps += log4j
 github.repo("path-utils")
